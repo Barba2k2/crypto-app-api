@@ -88,7 +88,7 @@ export class AuthService {
           name: firebaseUser.displayName || firebaseUser.email,
           firebaseId: firebaseUser.uid,
           googleId:
-            decodedToken.firebase.sign_in_provider === 'google.com'
+            decodedToken.firebase?.sign_in_provider === 'google.com'
               ? decodedToken.uid
               : null,
         });
@@ -96,7 +96,34 @@ export class AuthService {
 
       return user;
     } catch (error) {
-      throw new UnauthorizedException('Invalid token');
+      throw new UnauthorizedException('Invalid Firebase token');
     }
+  }
+
+  async validateJwtPayload(payload: any) {
+    const user = await this.usersService.findById(payload.sub);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+    return user;
+  }
+
+  async validateFirebaseUser(firebaseUser: any) {
+    let user = await this.usersService.findByEmail(firebaseUser.email);
+
+    if (!user) {
+      user = await this.usersService.create({
+        email: firebaseUser.email,
+        name: firebaseUser.displayName || firebaseUser.email,
+        firebaseId: firebaseUser.uid,
+      });
+    }
+
+    return user;
+  }
+
+  generateJwtToken(user: any) {
+    const payload = { email: user.email, sub: user.id };
+    return this.jwtService.sign(payload);
   }
 }
