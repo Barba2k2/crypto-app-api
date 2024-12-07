@@ -15,6 +15,8 @@ export class FirebaseAuthGuard implements CanActivate {
       throw new UnauthorizedException('No authorization header found');
     }
 
+    console.log('Auth Header:', authHeader);
+
     // Verifica se é um token Bearer válido
     if (!authHeader.startsWith('Bearer ')) {
       throw new UnauthorizedException('Invalid token format');
@@ -24,6 +26,8 @@ export class FirebaseAuthGuard implements CanActivate {
     if (!token) {
       throw new UnauthorizedException('No token provided');
     }
+
+    console.log('Token:', token);
 
     try {
       const user = await this.authService.validateFirebaseToken(token);
