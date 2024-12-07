@@ -9,8 +9,8 @@ import { User } from 'src/entities/user.entity';
 export class NotificationsService {
   constructor(
     @InjectRepository(Notification)
-    private notificationsRepository: Repository<Notification>,
-    private firebaseService: FirebaseService,
+    private readonly notificationsRepository: Repository<Notification>,
+    private readonly firebaseService: FirebaseService,
   ) {}
 
   async sendPriceAlert(
