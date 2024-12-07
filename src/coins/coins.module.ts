@@ -7,5 +7,6 @@ import { CoinsService } from './coins.service';
   imports: [HttpModule],
   controllers: [CoinsController],
   providers: [CoinsService],
+  exports: [CoinsService],
 })
 export class CoinsModule {}
