@@ -8,12 +8,18 @@ import {
 } from 'typeorm';
 import { Wallet } from './wallet.entity';
 import { FavoriteCoin } from './favorite-coin.entity';
-import { PriceAlert } from './price-alert';
+import { PriceAlert } from './price-alert.entity';
 
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ nullable: true })
+  fcmToken?: string;
+
+  @Column({ nullable: true })
+  firebaseId: string;
 
   @Column()
   name: string;

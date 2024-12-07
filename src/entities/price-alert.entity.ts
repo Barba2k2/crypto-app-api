@@ -1,9 +1,9 @@
 import {
-  Column,
-  CreateDateColumn,
   Entity,
-  ManyToOne,
   PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { User } from './user.entity';
@@ -16,14 +16,14 @@ export class PriceAlert {
   @Column()
   coinId: string;
 
-  @Column('decimal')
+  @Column('decimal', { precision: 18, scale: 8 })
   targetPrice: number;
 
   @Column()
   type: 'ABOVE' | 'BELOW';
 
   @Column({ default: false })
-  trigged: boolean;
+  triggered: boolean;
 
   @ManyToOne(() => User, (user) => user.priceAlerts)
   user: User;
