@@ -8,13 +8,13 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { PriceAlertsService } from './price-alerts.service';
-import { FirebaseAuthGuard } from '../auth/guards/firebase-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { CreatePriceAlertDto } from './dto/create-price-alert.dto';
 import { User } from 'src/entities/user.entity';
+import { AuthGuard } from 'src/auth/guards/auth.guard';
 
 @Controller('price-alerts')
-@UseGuards(FirebaseAuthGuard)
+@UseGuards(AuthGuard)
 export class PriceAlertsController {
   constructor(private readonly priceAlertsService: PriceAlertsService) {}
 

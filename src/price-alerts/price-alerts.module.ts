@@ -4,9 +4,11 @@ import { PriceAlertsService } from './price-alerts.service';
 import { PriceAlertsController } from './price-alerts.controller';
 import { CoinsModule } from '../coins/coins.module';
 import { NotificationsModule } from '../notifications/notifications.module';
-import { PriceAlert } from 'src/entities/price-alert.entity';
+import { PriceAlert } from '../entities/price-alert.entity';
 import { PriceAlertsScheduler } from './price-alerts.scheduler';
-import { AuthModule } from 'src/auth/auth.module';
+import { AuthModule } from '../auth/auth.module';
+import { FirebaseModule } from '../firebase/firebase.module';
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
@@ -14,6 +16,8 @@ import { AuthModule } from 'src/auth/auth.module';
     CoinsModule,
     NotificationsModule,
     AuthModule,
+    FirebaseModule,
+    UsersModule,
   ],
   providers: [PriceAlertsService, PriceAlertsScheduler],
   controllers: [PriceAlertsController],
