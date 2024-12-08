@@ -17,6 +17,7 @@ import { HttpModule } from '@nestjs/axios';
 import { CoinsModule } from './coins/coins.module';
 import { FavoritesModule } from './favorites/favorites.module';
 import { WalletsModule } from './wallets/wallets.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { WalletsModule } from './wallets/wallets.module';
     NotificationsModule,
     FavoritesModule,
     WalletsModule,
+    DashboardModule,
   ],
 })
 export class AppModule {}
