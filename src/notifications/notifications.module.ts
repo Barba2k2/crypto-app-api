@@ -5,10 +5,7 @@ import { Notification } from './entities/notification.entity';
 import { FirebaseModule } from '../firebase/firebase.module';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Notification]),
-    FirebaseModule,
-  ],
+  imports: [TypeOrmModule.forFeature([Notification]), FirebaseModule],
   providers: [NotificationsService],
   exports: [NotificationsService],
 })
