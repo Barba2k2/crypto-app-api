@@ -16,7 +16,7 @@ import { AddFavoriteDto } from './dto/add-favorite.dto';
 import { FirebaseAuthGuard } from 'src/auth/guards/firebase-auth.guard';
 
 @Controller('favorites')
-@UseGuards(FirebaseAuthGuard)
+@UseGuards(AuthGuard)
 export class FavoritesController {
   constructor(private readonly favoritesService: FavoritesService) {}
 
