@@ -7,6 +7,7 @@ import { User } from '../entities/user.entity';
 import { CoinsService } from '../coins/coins.service';
 import { CreateWalletDto } from './dto/create-wallet.dto';
 import { AddCoinDto } from './dto/add-coin.dto';
+import { UpdateCoinDto } from './dto/update-coin.dto';
 
 @Injectable()
 export class WalletsService {
@@ -118,5 +119,27 @@ export class WalletsService {
       total += holding.quantity * currentPrice;
     }
     return total;
+  }
+
+  async updateCoin(
+    user: User,
+    walletId: string,
+    holdingId: string,
+    updateCoinDto: UpdateCoinDto,
+  ) {
+    const wallet = await this.getWalletById(user, walletId);
+    const holding = await this.holdingsRepository.findOne({
+      where: {
+        id: holdingId,
+        wallet: { id: wallet.id },
+      },
+    });
+  
+    if (!holding) {
+      throw new NotFoundException('Coin holding not found');
+    }
+  
+    Object.assign(holding, updateCoinDto);
+    return this.holdingsRepository.save(holding);
   }
 }
