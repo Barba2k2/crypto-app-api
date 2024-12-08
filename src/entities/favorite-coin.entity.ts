@@ -9,9 +9,15 @@ export class FavoriteCoin {
   @Column()
   coinId: string;
 
-  @ManyToOne(() => User, user => user.favoriteCoins)
+  @ManyToOne(() => User, (user) => user.favoriteCoins)
   user: User;
 
   @CreateDateColumn()
   createdAt: Date;
+
+  @Column({ nullable: true })
+  alertOnPriceIncrease?: number;
+
+  @Column({ nullable: true })
+  alertOnPriceDecrease?: number;
 }
