@@ -15,6 +15,7 @@ import { FirebaseModule } from './firebase/firebase.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { HttpModule } from '@nestjs/axios';
 import { CoinsModule } from './coins/coins.module';
+import { FavoritesModule } from './favorites/favorites.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { CoinsModule } from './coins/coins.module';
     PriceAlertsModule,
     FirebaseModule,
     NotificationsModule,
+    FavoritesModule,
   ],
 })
 export class AppModule {}
