@@ -33,17 +33,43 @@ export class WalletsService {
       relations: ['holdings'],
     });
 
-    const walletsWithTotals = await Promise.all(
+    const walletsWithDetails = await Promise.all(
       wallets.map(async (wallet) => {
-        const totalValue = await this.calculateWalletValue(wallet);
+        const holdingsWithValues = await Promise.all(
+          wallet.holdings.map(async (holding) => {
+            const currentPrice = await this.coinsService.getCoinPrice(holding.coinId);
+            const totalInvested = holding.quantity * holding.purchasePrice;
+            const currentTotal = holding.quantity * currentPrice;
+
+            return {
+              ...holding,
+              coinId: holding.coinId,
+              quantity: holding.quantity,
+              purchasePrice: holding.purchasePrice,
+              currentPrice,
+              totalInvested,
+              currentTotal,
+              profitLoss: currentTotal - totalInvested,
+              profitLossPercentage: ((currentTotal - totalInvested) / totalInvested) * 100,
+            };
+          })
+        );
+
+        const walletTotal = holdingsWithValues.reduce((sum, h) => sum + h.currentTotal, 0);
+        const walletInvested = holdingsWithValues.reduce((sum, h) => sum + h.totalInvested, 0);
+
         return {
           ...wallet,
-          totalValue,
+          holdings: holdingsWithValues,
+          totalValue: walletTotal,
+          totalInvested: walletInvested,
+          profitLoss: walletTotal - walletInvested,
+          profitLossPercentage: ((walletTotal - walletInvested) / walletInvested) * 100,
         };
-      }),
+      })
     );
 
-    return walletsWithTotals;
+    return walletsWithDetails;
   }
 
   async getWallet(user: User, walletId: string) {
@@ -56,28 +82,41 @@ export class WalletsService {
       throw new NotFoundException('Wallet not found');
     }
 
-    const holdings = await Promise.all(
+    const holdingsWithDetails = await Promise.all(
       wallet.holdings.map(async (holding) => {
         const currentPrice = await this.coinsService.getCoinPrice(holding.coinId);
-        const value = holding.quantity * currentPrice;
-        const purchaseValue = holding.quantity * holding.purchasePrice;
-        const profit = value - purchaseValue;
-        const profitPercentage = (profit / purchaseValue) * 100;
+        const totalInvested = holding.quantity * holding.purchasePrice;
+        const currentTotal = holding.quantity * currentPrice;
 
         return {
           ...holding,
           currentPrice,
-          value,
-          profit,
-          profitPercentage,
+          totalInvested,
+          currentTotal,
+          profitLoss: currentTotal - totalInvested,
+          profitLossPercentage: ((currentTotal - totalInvested) / totalInvested) * 100,
+          transactions: [
+            {
+              date: holding.purchaseDate,
+              type: 'BUY',
+              quantity: holding.quantity,
+              price: holding.purchasePrice,
+            },
+          ],
         };
-      }),
+      })
     );
+
+    const walletTotal = holdingsWithDetails.reduce((sum, h) => sum + h.currentTotal, 0);
+    const walletInvested = holdingsWithDetails.reduce((sum, h) => sum + h.totalInvested, 0);
 
     return {
       ...wallet,
-      holdings,
-      totalValue: holdings.reduce((acc, holding) => acc + holding.value, 0),
+      holdings: holdingsWithDetails,
+      totalValue: walletTotal,
+      totalInvested: walletInvested,
+      profitLoss: walletTotal - walletInvested,
+      profitLossPercentage: ((walletTotal - walletInvested) / walletInvested) * 100,
     };
   }
 
@@ -100,27 +139,6 @@ export class WalletsService {
     });
   }
 
-  private async getWalletById(user: User, walletId: string) {
-    const wallet = await this.walletsRepository.findOne({
-      where: { id: walletId, user: { id: user.id } },
-    });
-
-    if (!wallet) {
-      throw new NotFoundException('Wallet not found');
-    }
-
-    return wallet;
-  }
-
-  private async calculateWalletValue(wallet: Wallet): Promise<number> {
-    let total = 0;
-    for (const holding of wallet.holdings) {
-      const currentPrice = await this.coinsService.getCoinPrice(holding.coinId);
-      total += holding.quantity * currentPrice;
-    }
-    return total;
-  }
-
   async updateCoin(
     user: User,
     walletId: string,
@@ -134,12 +152,24 @@ export class WalletsService {
         wallet: { id: wallet.id },
       },
     });
-  
+
     if (!holding) {
       throw new NotFoundException('Coin holding not found');
     }
-  
+
     Object.assign(holding, updateCoinDto);
     return this.holdingsRepository.save(holding);
+  }
+
+  private async getWalletById(user: User, walletId: string) {
+    const wallet = await this.walletsRepository.findOne({
+      where: { id: walletId, user: { id: user.id } },
+    });
+
+    if (!wallet) {
+      throw new NotFoundException('Wallet not found');
+    }
+
+    return wallet;
   }
 }
