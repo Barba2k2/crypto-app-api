@@ -18,4 +18,9 @@ export class DashboardController {
   getPerformanceHistory(@CurrentUser() user: User) {
     return this.dashboardService.getPerformanceHistory(user);
   }
+
+  @Get('performance')
+  getPortfolioPerformance(@CurrentUser() user: User) {
+    return this.dashboardService.getPortfolioPerformance(user);
+  }
 }
