@@ -22,6 +22,12 @@ export class CoinHolding {
   @Column('decimal')
   purchasePrice: number;
 
+  @Column({ default: 'USD' })
+  currency: string;
+
+  @Column('decimal', { nullable: true })
+  purchasePriceUSD: number;
+
   @Column()
   purchaseDate: Date;
 
