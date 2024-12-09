@@ -39,18 +39,19 @@ export class WalletsService {
       wallets.map(async (wallet) => {
         const holdingsWithValues = await Promise.all(
           wallet.holdings.map(async (holding) => {
-            const currentPrice = await this.coinsService.getCoinPrice(
+            const priceData = await this.coinsService.getCoinPrice(
               holding.coinId,
             );
             const totalInvested = holding.quantity * holding.purchasePrice;
-            const currentTotal = holding.quantity * currentPrice;
+            const currentTotal = holding.quantity * priceData.currentPrice;
 
             return {
               ...holding,
               coinId: holding.coinId,
               quantity: holding.quantity,
               purchasePrice: holding.purchasePrice,
-              currentPrice,
+              currentPrice: priceData.currentPrice,
+              priceChanges: priceData.priceChanges,
               totalInvested,
               currentTotal,
               profitLoss: currentTotal - totalInvested,
@@ -60,23 +61,61 @@ export class WalletsService {
           }),
         );
 
-        const walletTotal = holdingsWithValues.reduce(
-          (sum, h) => sum + h.currentTotal,
-          0,
-        );
-        const walletInvested = holdingsWithValues.reduce(
-          (sum, h) => sum + h.totalInvested,
-          0,
-        );
-
         return {
           ...wallet,
-          holdings: holdingsWithValues,
-          totalValue: walletTotal,
-          totalInvested: walletInvested,
-          profitLoss: walletTotal - walletInvested,
-          profitLossPercentage:
-            ((walletTotal - walletInvested) / walletInvested) * 100,
+          holdings: holdingsWithValues.map((holding) => ({
+            ...holding,
+            allocation:
+              (holding.currentTotal /
+                holdingsWithValues.reduce(
+                  (sum, h) => sum + h.currentTotal,
+                  0,
+                )) *
+              100,
+          })),
+          totalValue: holdingsWithValues.reduce(
+            (sum, h) => sum + h.currentTotal,
+            0,
+          ),
+          totalInvested: holdingsWithValues.reduce(
+            (sum, h) => sum + h.totalInvested,
+            0,
+          ),
+          priceChanges: {
+            '1h': holdingsWithValues.reduce(
+              (sum, h) =>
+                sum +
+                h.priceChanges['1h'] *
+                  (h.currentTotal /
+                    holdingsWithValues.reduce(
+                      (s, ho) => s + ho.currentTotal,
+                      0,
+                    )),
+              0,
+            ),
+            '24h': holdingsWithValues.reduce(
+              (sum, h) =>
+                sum +
+                h.priceChanges['24h'] *
+                  (h.currentTotal /
+                    holdingsWithValues.reduce(
+                      (s, ho) => s + ho.currentTotal,
+                      0,
+                    )),
+              0,
+            ),
+            '7d': holdingsWithValues.reduce(
+              (sum, h) =>
+                sum +
+                h.priceChanges['7d'] *
+                  (h.currentTotal /
+                    holdingsWithValues.reduce(
+                      (s, ho) => s + ho.currentTotal,
+                      0,
+                    )),
+              0,
+            ),
+          },
         };
       }),
     );
@@ -96,11 +135,8 @@ export class WalletsService {
 
     const holdingsWithDetails = await Promise.all(
       wallet.holdings.map(async (holding) => {
-        const currentPrice = await this.coinsService.getCoinPrice(
-          holding.coinId,
-        );
+        const priceData = await this.coinsService.getCoinPrice(holding.coinId);
 
-        // Conversão dos preços para a moeda escolhida
         const purchasePrice = await this.currencyService.convertCurrency(
           holding.purchasePriceUSD,
           'USD',
@@ -109,7 +145,7 @@ export class WalletsService {
 
         const currentPriceConverted =
           await this.currencyService.convertCurrency(
-            currentPrice,
+            priceData.currentPrice, // Aqui mudou
             'USD',
             currency,
           );
@@ -122,21 +158,13 @@ export class WalletsService {
           ...holding,
           purchasePrice,
           currentPrice: currentPriceConverted,
+          priceChanges: priceData.priceChanges,
           totalInvested,
           currentTotal,
           profitLoss: currentTotal - totalInvested,
           profitLossPercentage:
             ((currentTotal - totalInvested) / totalInvested) * 100,
           currency,
-          transactions: [
-            {
-              date: holding.purchaseDate,
-              type: 'BUY',
-              quantity: holding.quantity,
-              price: purchasePrice,
-              currency,
-            },
-          ],
         };
       }),
     );
