@@ -1,11 +1,11 @@
-import { Controller, Get, Patch, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Param, UseGuards, Post } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
-import { FirebaseAuthGuard } from '../auth/guards/firebase-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { User } from 'src/entities/user.entity';
+import { User } from '../entities/user.entity';
+import { AuthGuard } from '../auth/guards/auth.guard';
 
 @Controller('notifications')
-@UseGuards(FirebaseAuthGuard)
+@UseGuards(AuthGuard)
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
@@ -14,8 +14,23 @@ export class NotificationsController {
     return this.notificationsService.getUserNotifications(user);
   }
 
+  @Get('unread/count')
+  getUnreadCount(@CurrentUser() user: User) {
+    return this.notificationsService.getUnreadCount(user);
+  }
+
+  @Get('unread')
+  getUnreadNotifications(@CurrentUser() user: User) {
+    return this.notificationsService.getUnreadNotifications(user);
+  }
+
   @Patch(':id/read')
   markAsRead(@Param('id') id: string, @CurrentUser() user: User) {
     return this.notificationsService.markAsRead(id, user);
+  }
+
+  @Patch('read-all')
+  markAllAsRead(@CurrentUser() user: User) {
+    return this.notificationsService.markAllAsRead(user);
   }
 }
