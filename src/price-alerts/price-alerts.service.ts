@@ -23,25 +23,23 @@ export class PriceAlertsService {
     });
 
     for (const alert of alerts) {
-      const currentPrice = await this.coinsService.getCoinPrice(alert.coinId);
+      const priceData = await this.coinsService.getCoinPrice(alert.coinId);
 
       const shouldTrigger =
-        (alert.type === 'ABOVE' && currentPrice >= alert.targetPrice) ||
-        (alert.type === 'BELOW' && currentPrice <= alert.targetPrice);
+        (alert.type === 'ABOVE' &&
+          priceData.currentPrice >= alert.targetPrice) ||
+        (alert.type === 'BELOW' && priceData.currentPrice <= alert.targetPrice);
 
       if (shouldTrigger) {
         await this.notificationsService.sendPriceAlert(
           alert.user,
           alert.coinId,
-          currentPrice,
+          priceData.currentPrice,
           alert.targetPrice,
         );
 
-        // Atualizar o status do alerta
-        await this.priceAlertsRepository.update(
-          { id: alert.id },
-          { triggered: true },
-        );
+        alert.triggered = true;
+        await this.priceAlertsRepository.save(alert);
       }
     }
   }
