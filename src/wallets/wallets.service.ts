@@ -13,10 +13,10 @@ import { UpdateCoinDto } from './dto/update-coin.dto';
 export class WalletsService {
   constructor(
     @InjectRepository(Wallet)
-    private walletsRepository: Repository<Wallet>,
+    private readonly walletsRepository: Repository<Wallet>,
     @InjectRepository(CoinHolding)
-    private holdingsRepository: Repository<CoinHolding>,
-    private coinsService: CoinsService,
+    private readonly holdingsRepository: Repository<CoinHolding>,
+    private readonly coinsService: CoinsService,
   ) {}
 
   async createWallet(user: User, createWalletDto: CreateWalletDto) {
@@ -37,7 +37,9 @@ export class WalletsService {
       wallets.map(async (wallet) => {
         const holdingsWithValues = await Promise.all(
           wallet.holdings.map(async (holding) => {
-            const currentPrice = await this.coinsService.getCoinPrice(holding.coinId);
+            const currentPrice = await this.coinsService.getCoinPrice(
+              holding.coinId,
+            );
             const totalInvested = holding.quantity * holding.purchasePrice;
             const currentTotal = holding.quantity * currentPrice;
 
@@ -50,13 +52,20 @@ export class WalletsService {
               totalInvested,
               currentTotal,
               profitLoss: currentTotal - totalInvested,
-              profitLossPercentage: ((currentTotal - totalInvested) / totalInvested) * 100,
+              profitLossPercentage:
+                ((currentTotal - totalInvested) / totalInvested) * 100,
             };
-          })
+          }),
         );
 
-        const walletTotal = holdingsWithValues.reduce((sum, h) => sum + h.currentTotal, 0);
-        const walletInvested = holdingsWithValues.reduce((sum, h) => sum + h.totalInvested, 0);
+        const walletTotal = holdingsWithValues.reduce(
+          (sum, h) => sum + h.currentTotal,
+          0,
+        );
+        const walletInvested = holdingsWithValues.reduce(
+          (sum, h) => sum + h.totalInvested,
+          0,
+        );
 
         return {
           ...wallet,
@@ -64,9 +73,10 @@ export class WalletsService {
           totalValue: walletTotal,
           totalInvested: walletInvested,
           profitLoss: walletTotal - walletInvested,
-          profitLossPercentage: ((walletTotal - walletInvested) / walletInvested) * 100,
+          profitLossPercentage:
+            ((walletTotal - walletInvested) / walletInvested) * 100,
         };
-      })
+      }),
     );
 
     return walletsWithDetails;
@@ -84,7 +94,9 @@ export class WalletsService {
 
     const holdingsWithDetails = await Promise.all(
       wallet.holdings.map(async (holding) => {
-        const currentPrice = await this.coinsService.getCoinPrice(holding.coinId);
+        const currentPrice = await this.coinsService.getCoinPrice(
+          holding.coinId,
+        );
         const totalInvested = holding.quantity * holding.purchasePrice;
         const currentTotal = holding.quantity * currentPrice;
 
@@ -94,7 +106,8 @@ export class WalletsService {
           totalInvested,
           currentTotal,
           profitLoss: currentTotal - totalInvested,
-          profitLossPercentage: ((currentTotal - totalInvested) / totalInvested) * 100,
+          profitLossPercentage:
+            ((currentTotal - totalInvested) / totalInvested) * 100,
           transactions: [
             {
               date: holding.purchaseDate,
@@ -104,11 +117,17 @@ export class WalletsService {
             },
           ],
         };
-      })
+      }),
     );
 
-    const walletTotal = holdingsWithDetails.reduce((sum, h) => sum + h.currentTotal, 0);
-    const walletInvested = holdingsWithDetails.reduce((sum, h) => sum + h.totalInvested, 0);
+    const walletTotal = holdingsWithDetails.reduce(
+      (sum, h) => sum + h.currentTotal,
+      0,
+    );
+    const walletInvested = holdingsWithDetails.reduce(
+      (sum, h) => sum + h.totalInvested,
+      0,
+    );
 
     return {
       ...wallet,
@@ -116,7 +135,8 @@ export class WalletsService {
       totalValue: walletTotal,
       totalInvested: walletInvested,
       profitLoss: walletTotal - walletInvested,
-      profitLossPercentage: ((walletTotal - walletInvested) / walletInvested) * 100,
+      profitLossPercentage:
+        ((walletTotal - walletInvested) / walletInvested) * 100,
     };
   }
 
