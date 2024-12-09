@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsDateString } from 'class-validator';
+import { IsString, IsNumber, IsDateString, IsIn } from 'class-validator';
 
 export class AddCoinDto {
   @IsString()
@@ -9,6 +9,10 @@ export class AddCoinDto {
 
   @IsNumber()
   purchasePrice: number;
+
+  @IsString()
+  @IsIn(['USD', 'EUR', 'BRL'])
+  currency: string;
 
   @IsDateString()
   purchaseDate: string;

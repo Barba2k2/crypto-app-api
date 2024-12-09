@@ -8,6 +8,7 @@ import { CoinsService } from '../coins/coins.service';
 import { CreateWalletDto } from './dto/create-wallet.dto';
 import { AddCoinDto } from './dto/add-coin.dto';
 import { UpdateCoinDto } from './dto/update-coin.dto';
+import { CurrencyService } from 'src/shared/services/currency.service';
 
 @Injectable()
 export class WalletsService {
@@ -17,6 +18,7 @@ export class WalletsService {
     @InjectRepository(CoinHolding)
     private readonly holdingsRepository: Repository<CoinHolding>,
     private readonly coinsService: CoinsService,
+    private readonly currencyService: CurrencyService,
   ) {}
 
   async createWallet(user: User, createWalletDto: CreateWalletDto) {
@@ -82,7 +84,7 @@ export class WalletsService {
     return walletsWithDetails;
   }
 
-  async getWallet(user: User, walletId: string) {
+  async getWallet(user: User, walletId: string, currency: string = 'USD') {
     const wallet = await this.walletsRepository.findOne({
       where: { id: walletId, user: { id: user.id } },
       relations: ['holdings'],
@@ -97,23 +99,42 @@ export class WalletsService {
         const currentPrice = await this.coinsService.getCoinPrice(
           holding.coinId,
         );
-        const totalInvested = holding.quantity * holding.purchasePrice;
-        const currentTotal = holding.quantity * currentPrice;
+
+        // Conversão dos preços para a moeda escolhida
+        const purchasePrice = await this.currencyService.convertCurrency(
+          holding.purchasePriceUSD,
+          'USD',
+          currency,
+        );
+
+        const currentPriceConverted =
+          await this.currencyService.convertCurrency(
+            currentPrice,
+            'USD',
+            currency,
+          );
+
+        // Cálculos usando os valores convertidos
+        const totalInvested = holding.quantity * purchasePrice;
+        const currentTotal = holding.quantity * currentPriceConverted;
 
         return {
           ...holding,
-          currentPrice,
+          purchasePrice,
+          currentPrice: currentPriceConverted,
           totalInvested,
           currentTotal,
           profitLoss: currentTotal - totalInvested,
           profitLossPercentage:
             ((currentTotal - totalInvested) / totalInvested) * 100,
+          currency,
           transactions: [
             {
               date: holding.purchaseDate,
               type: 'BUY',
               quantity: holding.quantity,
-              price: holding.purchasePrice,
+              price: purchasePrice,
+              currency,
             },
           ],
         };
@@ -137,14 +158,23 @@ export class WalletsService {
       profitLoss: walletTotal - walletInvested,
       profitLossPercentage:
         ((walletTotal - walletInvested) / walletInvested) * 100,
+      currency,
     };
   }
 
   async addCoin(user: User, walletId: string, addCoinDto: AddCoinDto) {
     const wallet = await this.getWalletById(user, walletId);
 
+    // Converter o preço de compra para USD para armazenamento
+    const purchasePriceUSD = await this.currencyService.convertCurrency(
+      addCoinDto.purchasePrice,
+      addCoinDto.currency,
+      'USD',
+    );
+
     const holding = this.holdingsRepository.create({
       ...addCoinDto,
+      purchasePriceUSD,
       wallet,
     });
 

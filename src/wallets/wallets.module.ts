@@ -5,9 +5,10 @@ import { WalletsController } from './wallets.controller';
 import { Wallet } from '../entities/wallet.entity';
 import { CoinHolding } from '../entities/coin-holding.entity';
 import { CoinsModule } from '../coins/coins.module';
-import { UsersModule } from 'src/users/users.module';
-import { FirebaseModule } from 'src/firebase/firebase.module';
-import { AuthModule } from 'src/auth/auth.module';
+import { UsersModule } from '../users/users.module';
+import { FirebaseModule } from '../firebase/firebase.module';
+import { AuthModule } from '../auth/auth.module';
+import { CurrencyModule } from '../shared/modules/currency.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { AuthModule } from 'src/auth/auth.module';
     AuthModule,
     FirebaseModule,
     UsersModule,
+    CurrencyModule,
   ],
   controllers: [WalletsController],
   providers: [WalletsService],
