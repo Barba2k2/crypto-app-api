@@ -1,4 +1,3 @@
-import { User } from 'src/entities/user.entity';
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -6,6 +5,8 @@ import {
   ManyToOne,
   CreateDateColumn,
 } from 'typeorm';
+import { User } from '../../entities/user.entity';
+import { NotificationType } from '../types/notification.types';
 
 @Entity('notifications')
 export class Notification {
@@ -19,10 +20,16 @@ export class Notification {
   body: string;
 
   @Column()
-  type: 'PRICE_ALERT' | 'PORTFOLIO_UPDATE' | 'SYSTEM';
+  type: NotificationType;
+
+  @Column({ type: 'jsonb', nullable: true })
+  metadata: Record<string, any>;
 
   @Column({ default: false })
   read: boolean;
+
+  @Column({ default: false })
+  pushed: boolean;
 
   @ManyToOne(() => User)
   user: User;
