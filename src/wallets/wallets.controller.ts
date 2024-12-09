@@ -7,6 +7,7 @@ import {
   Param,
   UseGuards,
   Put,
+  Query,
 } from '@nestjs/common';
 import { WalletsService } from './wallets.service';
 import { AuthGuard } from '../auth/guards/auth.guard';
@@ -19,10 +20,13 @@ import { UpdateCoinDto } from './dto/update-coin.dto';
 @Controller('wallets')
 @UseGuards(AuthGuard)
 export class WalletsController {
-  constructor(private readonly walletsService: WalletsService) { }
+  constructor(private readonly walletsService: WalletsService) {}
 
   @Post()
-  createWallet(@CurrentUser() user: User, @Body() createWalletDto: CreateWalletDto) {
+  createWallet(
+    @CurrentUser() user: User,
+    @Body() createWalletDto: CreateWalletDto,
+  ) {
     return this.walletsService.createWallet(user, createWalletDto);
   }
 
@@ -32,8 +36,12 @@ export class WalletsController {
   }
 
   @Get(':id')
-  getWallet(@CurrentUser() user: User, @Param('id') id: string) {
-    return this.walletsService.getWallet(user, id);
+  getWallet(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Query('currency') currency: string = 'USD',
+  ) {
+    return this.walletsService.getWallet(user, id, currency);
   }
 
   @Post(':id/coins')
@@ -61,6 +69,11 @@ export class WalletsController {
     @Param('holdingId') holdingId: string,
     @Body() updateCoinDto: UpdateCoinDto,
   ) {
-    return this.walletsService.updateCoin(user, walletId, holdingId, updateCoinDto);
+    return this.walletsService.updateCoin(
+      user,
+      walletId,
+      holdingId,
+      updateCoinDto,
+    );
   }
 }

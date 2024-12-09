@@ -9,6 +9,7 @@ import { UsersModule } from '../users/users.module';
 import { FirebaseModule } from '../firebase/firebase.module';
 import { AuthModule } from '../auth/auth.module';
 import { CurrencyModule } from '../shared/modules/currency.module';
+import { SharedModule } from 'src/shared/shared.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { CurrencyModule } from '../shared/modules/currency.module';
     FirebaseModule,
     UsersModule,
     CurrencyModule,
+    SharedModule,
   ],
   controllers: [WalletsController],
   providers: [WalletsService],
