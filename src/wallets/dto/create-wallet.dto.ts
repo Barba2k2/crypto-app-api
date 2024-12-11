@@ -9,4 +9,12 @@ export class CreateWalletDto {
 
   @IsHexColor()
   iconColor: string;
+
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  @IsOptional()
+  @IsString()
+  chain?: 'eth' | 'bsc' | 'polygon' | 'avalanche';
 }
