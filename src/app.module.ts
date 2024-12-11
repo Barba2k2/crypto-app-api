@@ -18,6 +18,7 @@ import { CoinsModule } from './coins/coins.module';
 import { FavoritesModule } from './favorites/favorites.module';
 import { WalletsModule } from './wallets/wallets.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { MoralisModule } from './moralis/moralis.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     FavoritesModule,
     WalletsModule,
     DashboardModule,
+    MoralisModule,
   ],
 })
 export class AppModule {}
