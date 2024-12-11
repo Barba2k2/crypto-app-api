@@ -35,4 +35,13 @@ export class Wallet {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @Column({ nullable: true })
+  address: string;
+
+  @Column({ nullable: true })
+  chain: string;
+
+  @Column('jsonb', { nullable: true })
+  balanceData: any;
 }
