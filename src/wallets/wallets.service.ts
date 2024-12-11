@@ -9,6 +9,41 @@ import { CreateWalletDto } from './dto/create-wallet.dto';
 import { AddCoinDto } from './dto/add-coin.dto';
 import { UpdateCoinDto } from './dto/update-coin.dto';
 import { CurrencyService } from 'src/shared/services/currency.service';
+import Moralis from 'moralis';
+import { WalletWithDetails } from 'src/types/wallet.types';
+import { chainMapping } from 'src/types/chain.types';
+
+interface FormattedWalletBalance {
+  nativeBalance: {
+    balance: string;
+    symbol: string;
+  };
+  tokens: {
+    address: string;
+    symbol: string;
+    name: string;
+    balance: string;
+    decimals: number;
+  }[];
+}
+
+interface PriceCalculation {
+  totalInvested: number;
+  currentTotal: number;
+  profitLoss: number;
+  profitLossPercentage: number;
+}
+
+interface HoldingWithDetails extends CoinHolding {
+  currentPrice: number;
+  priceChanges: Record<string, number>;
+  totalInvested: number;
+  currentTotal: number;
+  profitLoss: number;
+  profitLossPercentage: number;
+  allocation?: number;
+  currency: string;
+}
 
 @Injectable()
 export class WalletsService {
@@ -21,15 +56,260 @@ export class WalletsService {
     private readonly currencyService: CurrencyService,
   ) {}
 
-  async createWallet(user: User, createWalletDto: CreateWalletDto) {
-    const wallet = this.walletsRepository.create({
-      ...createWalletDto,
-      user,
-    });
-    return this.walletsRepository.save(wallet);
+  private calculateFinancials(
+    total: number,
+    invested: number,
+  ): PriceCalculation {
+    const profitLoss = total - invested;
+    return {
+      totalInvested: invested,
+      currentTotal: total,
+      profitLoss,
+      profitLossPercentage: invested > 0 ? (profitLoss / invested) * 100 : 0,
+    };
   }
 
-  async getWallets(user: User) {
+  private calculateAllocation(amount: number, total: number): number {
+    return total > 0 ? (amount / total) * 100 : 0;
+  }
+
+  private calculateWeightedPriceChanges(
+    holdings: HoldingWithDetails[],
+  ): Record<string, number> {
+    const totalValue = holdings.reduce((sum, h) => sum + h.currentTotal, 0);
+    const periods = ['1h', '24h', '7d'];
+
+    return periods.reduce((changes, period) => {
+      changes[period] = holdings.reduce(
+        (sum, holding) =>
+          sum +
+          holding.priceChanges[period] *
+            this.calculateAllocation(holding.currentTotal, totalValue),
+        0,
+      );
+      return changes;
+    }, {});
+  }
+
+  private async getWalletBalances(
+    address: string,
+    chain: string,
+  ): Promise<FormattedWalletBalance> {
+    try {
+      const chainId = chainMapping[chain.toLowerCase()];
+      if (!chainId) {
+        throw new Error(`Unsupported chain: ${chain}`);
+      }
+
+      const [nativeBalance, tokenBalances] = await Promise.all([
+        Moralis.EvmApi.balance.getNativeBalance({
+          address,
+          chain: chainId,
+        }),
+        Moralis.EvmApi.token
+          .getWalletTokenBalances({
+            address,
+            chain: chainId,
+          })
+          .catch((error) => {
+            console.warn(`Error fetching token balances: ${error.message}`);
+            return { result: [] };
+          }),
+      ]);
+
+      // Log detalhado dos tokens
+      tokenBalances.result.forEach((token, index) => {
+        console.log(`Token ${index}:`, {
+          raw_balance: token.amount,
+          decimals: token.token.decimals,
+          symbol: token.token.symbol,
+          name: token.token.name,
+        });
+      });
+
+      return {
+        nativeBalance: {
+          balance: nativeBalance.result.balance.toString(),
+          symbol: chain === 'eth' ? 'ETH' : chain.toUpperCase(),
+        },
+        tokens: tokenBalances.result.map((token) => {
+          // Convertendo o balance considerando os decimais
+          const balance = token.amount?.toString() || '0';
+          const decimals = token.token.decimals || 18;
+
+          // Se o balance for 0, log para debug
+          if (balance === '0') {
+            console.log(`Zero balance found for token:`, {
+              symbol: token.token.symbol,
+              raw_balance: token.amount,
+              decimals: decimals,
+            });
+          }
+
+          return {
+            address: token.token.contractAddress,
+            symbol: token.token.symbol || 'Unknown',
+            name: token.token.name || 'Unknown',
+            balance: balance,
+            decimals: decimals,
+          };
+        }),
+      };
+    } catch (error) {
+      console.error('Error fetching wallet balances:', error);
+      throw error;
+    }
+  }
+
+  private async getWalletTransactions(address: string, chain: string) {
+    try {
+      const chainId = chainMapping[chain.toLowerCase()];
+      if (!chainId) {
+        throw new Error(`Unsupported chain: ${chain}`);
+      }
+
+      const transactions =
+        await Moralis.EvmApi.transaction.getWalletTransactions({
+          address,
+          chain: chainId,
+          limit: 100,
+        });
+
+      return transactions.result.map((tx) => ({
+        hash: tx.hash,
+        from: tx.from.lowercase,
+        to: tx.to?.lowercase,
+        value: tx.value.toString(),
+        gas: tx.gas.toString(),
+        gasPrice: tx.gasPrice.toString(),
+        timestamp: tx.blockTimestamp.toISOString(),
+      }));
+    } catch (error) {
+      console.error('Error fetching wallet transactions:', error);
+      throw error;
+    }
+  }
+
+  private async getWalletBlockchainData(address: string, chain: string) {
+    const [balances, transactions] = await Promise.all([
+      this.getWalletBalances(address, chain),
+      this.getWalletTransactions(address, chain),
+    ]);
+    return { balances, transactions };
+  }
+
+  private async processHoldings(
+    holdings: CoinHolding[],
+    currency: string,
+  ): Promise<HoldingWithDetails[]> {
+    const processedHoldings = await Promise.all(
+      holdings.map(async (holding) => {
+        const priceData = await this.coinsService.getCoinPrice(holding.coinId);
+        const [purchasePrice, currentPrice] = await Promise.all([
+          this.currencyService.convertCurrency(
+            holding.purchasePriceUSD,
+            'USD',
+            currency,
+          ),
+          this.currencyService.convertCurrency(
+            priceData.currentPrice,
+            'USD',
+            currency,
+          ),
+        ]);
+
+        const financials = this.calculateFinancials(
+          holding.quantity * currentPrice,
+          holding.quantity * purchasePrice,
+        );
+
+        return {
+          ...holding,
+          ...financials,
+          purchasePrice,
+          currentPrice,
+          priceChanges: priceData.priceChanges,
+          currency,
+        };
+      }),
+    );
+
+    const totalValue = processedHoldings.reduce(
+      (sum, h) => sum + h.currentTotal,
+      0,
+    );
+
+    return processedHoldings.map((holding) => ({
+      ...holding,
+      allocation: this.calculateAllocation(holding.currentTotal, totalValue),
+    }));
+  }
+
+  async createWallet(
+    user: User,
+    createWalletDto: CreateWalletDto,
+  ): Promise<WalletWithDetails> {
+    try {
+      let wallet: Wallet;
+
+      if (createWalletDto.address) {
+        const blockchainData = await this.getWalletBlockchainData(
+          createWalletDto.address,
+          createWalletDto.chain,
+        );
+
+        wallet = await this.walletsRepository.save(
+          this.walletsRepository.create({
+            ...createWalletDto,
+            user,
+            balanceData: blockchainData,
+          }),
+        );
+      } else {
+        wallet = await this.walletsRepository.save(
+          this.walletsRepository.create({
+            ...createWalletDto,
+            user,
+          }),
+        );
+      }
+
+      const holdings = await this.processHoldings(wallet.holdings || [], 'USD');
+      const financials = this.calculateFinancials(
+        holdings.reduce((sum, h) => sum + h.currentTotal, 0),
+        holdings.reduce((sum, h) => sum + h.totalInvested, 0),
+      );
+
+      const response: WalletWithDetails = {
+        ...wallet,
+        holdings,
+        currentTotal: financials.currentTotal,
+        totalInvested: financials.totalInvested,
+        profitLoss: financials.profitLoss,
+        profitLossPercentage: financials.profitLossPercentage,
+        priceChanges: this.calculateWeightedPriceChanges(holdings),
+        currency: 'USD',
+      };
+
+      if (wallet.address && wallet.chain) {
+        const blockchainData = await this.getWalletBlockchainData(
+          wallet.address,
+          wallet.chain,
+        );
+        return {
+          ...response,
+          ...blockchainData,
+        };
+      }
+
+      return response;
+    } catch (error) {
+      console.error('Error creating wallet:', error);
+      throw error;
+    }
+  }
+
+  async getWallets(user: User): Promise<WalletWithDetails[]> {
     const wallets = await this.walletsRepository.find({
       where: { user: { id: user.id } },
       relations: ['holdings'],
@@ -37,85 +317,18 @@ export class WalletsService {
 
     const walletsWithDetails = await Promise.all(
       wallets.map(async (wallet) => {
-        const holdingsWithValues = await Promise.all(
-          wallet.holdings.map(async (holding) => {
-            const priceData = await this.coinsService.getCoinPrice(
-              holding.coinId,
-            );
-            const totalInvested = holding.quantity * holding.purchasePrice;
-            const currentTotal = holding.quantity * priceData.currentPrice;
-
-            return {
-              ...holding,
-              coinId: holding.coinId,
-              quantity: holding.quantity,
-              purchasePrice: holding.purchasePrice,
-              currentPrice: priceData.currentPrice,
-              priceChanges: priceData.priceChanges,
-              totalInvested,
-              currentTotal,
-              profitLoss: currentTotal - totalInvested,
-              profitLossPercentage:
-                ((currentTotal - totalInvested) / totalInvested) * 100,
-            };
-          }),
+        const holdings = await this.processHoldings(wallet.holdings, 'USD');
+        const financials = this.calculateFinancials(
+          holdings.reduce((sum, h) => sum + h.currentTotal, 0),
+          holdings.reduce((sum, h) => sum + h.totalInvested, 0),
         );
 
         return {
           ...wallet,
-          holdings: holdingsWithValues.map((holding) => ({
-            ...holding,
-            allocation:
-              (holding.currentTotal /
-                holdingsWithValues.reduce(
-                  (sum, h) => sum + h.currentTotal,
-                  0,
-                )) *
-              100,
-          })),
-          totalValue: holdingsWithValues.reduce(
-            (sum, h) => sum + h.currentTotal,
-            0,
-          ),
-          totalInvested: holdingsWithValues.reduce(
-            (sum, h) => sum + h.totalInvested,
-            0,
-          ),
-          priceChanges: {
-            '1h': holdingsWithValues.reduce(
-              (sum, h) =>
-                sum +
-                h.priceChanges['1h'] *
-                  (h.currentTotal /
-                    holdingsWithValues.reduce(
-                      (s, ho) => s + ho.currentTotal,
-                      0,
-                    )),
-              0,
-            ),
-            '24h': holdingsWithValues.reduce(
-              (sum, h) =>
-                sum +
-                h.priceChanges['24h'] *
-                  (h.currentTotal /
-                    holdingsWithValues.reduce(
-                      (s, ho) => s + ho.currentTotal,
-                      0,
-                    )),
-              0,
-            ),
-            '7d': holdingsWithValues.reduce(
-              (sum, h) =>
-                sum +
-                h.priceChanges['7d'] *
-                  (h.currentTotal /
-                    holdingsWithValues.reduce(
-                      (s, ho) => s + ho.currentTotal,
-                      0,
-                    )),
-              0,
-            ),
-          },
+          ...financials,
+          totalValue: financials.currentTotal,
+          holdings,
+          priceChanges: this.calculateWeightedPriceChanges(holdings),
         };
       }),
     );
@@ -123,7 +336,11 @@ export class WalletsService {
     return walletsWithDetails;
   }
 
-  async getWallet(user: User, walletId: string, currency: string = 'USD') {
+  async getWallet(
+    user: User,
+    walletId: string,
+    currency: string = 'USD',
+  ): Promise<WalletWithDetails> {
     const wallet = await this.walletsRepository.findOne({
       where: { id: walletId, user: { id: user.id } },
       relations: ['holdings'],
@@ -133,67 +350,35 @@ export class WalletsService {
       throw new NotFoundException('Wallet not found');
     }
 
-    const holdingsWithDetails = await Promise.all(
-      wallet.holdings.map(async (holding) => {
-        const priceData = await this.coinsService.getCoinPrice(holding.coinId);
-
-        const purchasePrice = await this.currencyService.convertCurrency(
-          holding.purchasePriceUSD,
-          'USD',
-          currency,
-        );
-
-        const currentPriceConverted =
-          await this.currencyService.convertCurrency(
-            priceData.currentPrice, // Aqui mudou
-            'USD',
-            currency,
-          );
-
-        // Cálculos usando os valores convertidos
-        const totalInvested = holding.quantity * purchasePrice;
-        const currentTotal = holding.quantity * currentPriceConverted;
-
-        return {
-          ...holding,
-          purchasePrice,
-          currentPrice: currentPriceConverted,
-          priceChanges: priceData.priceChanges,
-          totalInvested,
-          currentTotal,
-          profitLoss: currentTotal - totalInvested,
-          profitLossPercentage:
-            ((currentTotal - totalInvested) / totalInvested) * 100,
-          currency,
-        };
-      }),
+    const holdings = await this.processHoldings(wallet.holdings, currency);
+    const financials = this.calculateFinancials(
+      holdings.reduce((sum, h) => sum + h.currentTotal, 0),
+      holdings.reduce((sum, h) => sum + h.totalInvested, 0),
     );
 
-    const walletTotal = holdingsWithDetails.reduce(
-      (sum, h) => sum + h.currentTotal,
-      0,
-    );
-    const walletInvested = holdingsWithDetails.reduce(
-      (sum, h) => sum + h.totalInvested,
-      0,
-    );
-
-    return {
+    const response = {
       ...wallet,
-      holdings: holdingsWithDetails,
-      totalValue: walletTotal,
-      totalInvested: walletInvested,
-      profitLoss: walletTotal - walletInvested,
-      profitLossPercentage:
-        ((walletTotal - walletInvested) / walletInvested) * 100,
+      ...financials,
+      totalValue: financials.currentTotal,
+      holdings,
+      priceChanges: this.calculateWeightedPriceChanges(holdings),
       currency,
     };
+
+    if (wallet.address) {
+      const blockchainData = await this.getWalletBlockchainData(
+        wallet.address,
+        wallet.chain,
+      );
+      return { ...response, ...blockchainData };
+    }
+
+    return response;
   }
 
   async addCoin(user: User, walletId: string, addCoinDto: AddCoinDto) {
     const wallet = await this.getWalletById(user, walletId);
 
-    // Converter o preço de compra para USD para armazenamento
     const purchasePriceUSD = await this.currencyService.convertCurrency(
       addCoinDto.purchasePrice,
       addCoinDto.currency,

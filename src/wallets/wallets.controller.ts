@@ -16,6 +16,7 @@ import { User } from '../entities/user.entity';
 import { CreateWalletDto } from './dto/create-wallet.dto';
 import { AddCoinDto } from './dto/add-coin.dto';
 import { UpdateCoinDto } from './dto/update-coin.dto';
+import { WalletWithDetails } from '../types/wallet.types';
 
 @Controller('wallets')
 @UseGuards(AuthGuard)
@@ -26,12 +27,12 @@ export class WalletsController {
   createWallet(
     @CurrentUser() user: User,
     @Body() createWalletDto: CreateWalletDto,
-  ) {
+  ): Promise<WalletWithDetails> {
     return this.walletsService.createWallet(user, createWalletDto);
   }
 
   @Get()
-  getWallets(@CurrentUser() user: User) {
+  getWallets(@CurrentUser() user: User): Promise<WalletWithDetails[]> {
     return this.walletsService.getWallets(user);
   }
 
@@ -40,7 +41,7 @@ export class WalletsController {
     @CurrentUser() user: User,
     @Param('id') id: string,
     @Query('currency') currency: string = 'USD',
-  ) {
+  ): Promise<WalletWithDetails> {
     return this.walletsService.getWallet(user, id, currency);
   }
 
@@ -58,7 +59,7 @@ export class WalletsController {
     @CurrentUser() user: User,
     @Param('walletId') walletId: string,
     @Param('holdingId') holdingId: string,
-  ) {
+  ): Promise<void> {
     return this.walletsService.removeCoin(user, walletId, holdingId);
   }
 
